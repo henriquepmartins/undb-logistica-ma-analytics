@@ -1,0 +1,2 @@
+"""LogisticaMA analytics package."""
+
