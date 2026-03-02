@@ -11,192 +11,104 @@ Desafio 4.0 - Projeto e Análise de Algoritmos · UNDB
 - José Fernando de Sá
 - Pedro Reche
 
-## Visão rápida
+## Descrição
 
-Este projeto foi criado para ajudar a empresa fictícia **LogísticaMA** a entender, com clareza, onde a operação está falhando.
+Este projeto propõe uma solução computacional para o problema de consulta eficiente sobre logs de rastreamento logístico. O objetivo é responder perguntas do tipo *"quantos pacotes atrasaram mais de 30 minutos entre 14h e 18h?"* em menos de 3 segundos, mesmo com volumes de até 2 milhões de eventos.
 
-Na prática, o sistema responde perguntas como:
+O sistema inclui um motor de consulta indexado, benchmarks comparativos e um dashboard interativo desenvolvido em Streamlit.
 
-- quantos pacotes atrasaram em um período
-- quais hubs estão com pior desempenho
-- em que horário os atrasos aumentaram
+## Contexto do Problema
 
-Tudo isso aparece em um **dashboard visual em Streamlit**, pensado para apresentação acadêmica e para pessoas que não são técnicas.
+A abordagem original percorre todos os registros a cada consulta, resultando em custo linear **O(n)**. Em ambiente de testes, o comportamento é o seguinte:
 
-## Por que este projeto existe
+| Volume         | Tempo de resposta |
+|----------------|-------------------|
+| 10.000 eventos | ~0,8 segundos     |
+| 100.000 eventos| ~18 segundos      |
+| 1,2M de eventos| > 4 minutos       |
 
-O problema do desafio é simples de entender:
+Esse comportamento torna o sistema inviável para tomada de decisão em tempo real.
 
-- a empresa tem muitos logs
-- as consultas estavam sendo feitas de forma lenta
-- quando o volume cresce, o sistema trava
-
-A solução deste repositório é trocar a busca linear por uma estratégia com **índices em memória**, o que reduz muito o tempo de resposta.
-
-## O que você encontra aqui
-
-- um dashboard pronto para demonstrar a solução
-- um motor de consultas otimizado
-- benchmark comparando abordagem lenta e abordagem indexada
-- testes automatizados
-- documentação organizada para facilitar entendimento
-
-## Como usar sem ser técnico
-
-### 1. Abrir o painel
-
-Depois de instalar o projeto, rode:
-
-```bash
-uv run streamlit run app/streamlit_app.py
+```python
+# implementação linear de referência
+def contar_atrasos_linear(logs, inicio, fim):
+    total = 0
+    for evento in logs:
+        if inicio <= evento['timestamp'] <= fim:
+            if evento['atraso_min'] > 30:
+                total += 1
+    return total
 ```
 
-O painel abrirá no navegador.
+## Algoritmo Adotado
 
-### 2. O que dá para fazer no painel
+A solução substitui a varredura linear por uma estrutura indexada composta de três etapas:
 
-- usar a base de demonstração que já acompanha o projeto
-- enviar um arquivo real em `CSV` ou `JSON`
-- escolher período de análise
-- filtrar por hub e status
-- ajustar o limite de atraso em minutos
+### Pré-processamento (executado uma única vez)
 
-### 3. Como interpretar o dashboard
+1. Ordenação dos eventos por `timestamp` - custo **Θ(n log n)**
+2. Construção de vetores de prefix sums por hub e status sobre `atraso_min` - custo **Θ(n)**
 
-**Eventos na janela**  
-Mostra quantos registros existem no período escolhido.
+### Consulta (executada repetidamente)
 
-**Atrasos acima do corte**  
-Mostra quantos eventos ultrapassaram o limite definido.
+1. Busca binária (`bisect`) para localizar os limites do intervalo de tempo - custo **Θ(log n)**
+2. Resposta via diferença de prefix sums - custo **Θ(1)**
 
-**Atraso médio**  
-Resume o tamanho médio dos atrasos naquele recorte.
+### Análise de Complexidade
 
-**Pior atraso**  
-Aponta o caso mais crítico encontrado.
+| Etapa              | Custo        |
+|--------------------|--------------|
+| Pré-processamento  | Θ(n log n)   |
+| Consulta           | Θ(log n)     |
+| Memória adicional  | Θ(n)         |
 
-**Panorama**  
-Ajuda a entender rapidamente se a operação está estável ou sob pressão.
+O custo de pré-processamento é amortizado ao longo das consultas. Cada consulta subsequente opera em **Θ(log n)**, o que representa uma redução substancial frente ao **Θ(n)** da abordagem linear, especialmente em bases com alto volume de dados.
 
-**Hubs críticos**  
-Mostra onde a operação está mais sensível.
+## Estrutura do Projeto
 
-**Linha do tempo**  
-Permite enxergar quando os problemas aumentam.
-
-**Base carregada**  
-Mostra os registros usados e permite baixar o recorte filtrado.
-
-## Ideia central do algoritmo
-
-A abordagem lenta faz o seguinte:
-
-1. lê todos os eventos
-2. percorre tudo a cada consulta
-3. conta manualmente os atrasos
-
-Isso tende a custo **Θ(n)** por consulta.
-
-Neste projeto, a abordagem escolhida:
-
-1. ordena os eventos por tempo
-2. cria índices por tempo, hub e status
-3. usa busca binária para localizar a janela da consulta
-4. usa prefix sums para responder mais rápido
-
-Resultado:
-
-- preparação inicial com custo maior
-- consultas repetidas muito mais rápidas
-- melhor escalabilidade para grandes volumes
-
-## Estrutura do projeto
-
-O código mistura conceitos de **arquitetura limpa** e **arquitetura hexagonal** para ficar mais fácil de manter:
-
-```text
+```
 src/logisticama/
-  domain/        regras centrais e contratos
+  domain/        entidades e contratos de domínio
   application/   casos de uso
-  adapters/      ingestão, índices e interface
+  adapters/      ingestão de dados, índice, dashboard
   shared/        utilitários comuns
 app/
-  streamlit_app.py
+  streamlit_app.py      interface principal
 benchmarks/
-  run_benchmarks.py
+  run_benchmarks.py     comparação linear x indexado
 tests/
   test_indexed_repository.py
 ```
 
-## Tecnologias usadas
+Implementação central: [src/logisticama/adapters/persistence/indexed_repository.py](src/logisticama/adapters/persistence/indexed_repository.py)
 
-- Python 3.12
-- uv
-- Streamlit
-- pandas
-- numpy
-- plotly
-- pytest
-
-## Setup técnico
-
-### Instalar dependências
+## Instalação e Execução
 
 ```bash
+# instalar dependências
 uv sync
-```
 
-### Rodar testes
-
-```bash
+# executar testes
 uv run pytest
-```
 
-### Rodar benchmark
-
-```bash
-uv run python benchmarks/run_benchmarks.py --sizes 1000 10000 100000
-```
-
-### Rodar o dashboard
-
-```bash
+# iniciar dashboard
 uv run streamlit run app/streamlit_app.py
+
+# executar benchmarks
+uv run python benchmarks/run_benchmarks.py --sizes 1000 10000 100000 1000000
 ```
 
-### Gerar requirements para deploy
-
-```bash
-uv export --no-dev --no-hashes --format requirements-txt > requirements.txt
-```
-
-## Formato esperado do dataset
-
-O projeto espera estas colunas:
-
-- `id`
-- `timestamp`
-- `status`
-- `hub`
-- `atraso_min`
-
-Exemplo:
+## Formato do Dataset
 
 ```csv
 id,timestamp,status,hub,atraso_min
 LM20260207-00123,2026-02-07T09:15:42-03:00,triagem,Ponta_Areia,0
 ```
 
-## Arquivos mais importantes
+Colunas obrigatórias: `id`, `timestamp`, `status`, `hub`, `atraso_min`.
 
-- `app/streamlit_app.py`: dashboard principal
-- `src/logisticama/adapters/persistence/indexed_repository.py`: motor indexado
-- `benchmarks/run_benchmarks.py`: comparação de desempenho
-- `data/demo/logistica_ma_demo.csv`: base de demonstração
+Dataset fornecido pela disciplina: [Google Drive](https://drive.google.com/drive/folders/19-pRmLe-V4rKv2VeuvytIGja6qm5zybJ)
 
-## Próximos passos naturais
+## Tecnologias
 
-- carregar o dataset real da disciplina
-- executar benchmarks com volumes maiores
-- registrar prints do dashboard
-- transformar os resultados em PDF para entrega final
+Python 3.12, uv, Streamlit, pandas, numpy, plotly, pytest
