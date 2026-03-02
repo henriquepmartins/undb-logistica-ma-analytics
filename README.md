@@ -1,6 +1,6 @@
 # LogisticaMA Analytics
 
-Desafio 4.0 — Projeto e Análise de Algoritmos · UNDB
+Desafio 4.0 - Projeto e Análise de Algoritmos · UNDB
 
 ## Colaboradores
 
@@ -11,85 +11,192 @@ Desafio 4.0 — Projeto e Análise de Algoritmos · UNDB
 - José Fernando de Sá
 - Pedro Reche
 
----
+## Visão rápida
 
-## Problema
+Este projeto foi criado para ajudar a empresa fictícia **LogísticaMA** a entender, com clareza, onde a operação está falhando.
 
-A LogísticaMA precisa responder consultas como _"quantos pacotes atrasaram mais de 30 minutos entre 14h e 18h?"_ sobre até **2 milhões de eventos** em menos de **3 segundos**.
+Na prática, o sistema responde perguntas como:
 
-A abordagem atual usa varredura linear: para cada consulta, percorre todos os registros um a um — custo **Θ(n)** por consulta.
+- quantos pacotes atrasaram em um período
+- quais hubs estão com pior desempenho
+- em que horário os atrasos aumentaram
 
-```python
-# abordagem lenta — O(n) por consulta
-def contar_atrasos_linear(logs, inicio, fim):
-    return sum(1 for e in logs if inicio <= e['timestamp'] <= fim and e['atraso_min'] > 30)
+Tudo isso aparece em um **dashboard visual em Streamlit**, pensado para apresentação acadêmica e para pessoas que não são técnicas.
+
+## Por que este projeto existe
+
+O problema do desafio é simples de entender:
+
+- a empresa tem muitos logs
+- as consultas estavam sendo feitas de forma lenta
+- quando o volume cresce, o sistema trava
+
+A solução deste repositório é trocar a busca linear por uma estratégia com **índices em memória**, o que reduz muito o tempo de resposta.
+
+## O que você encontra aqui
+
+- um dashboard pronto para demonstrar a solução
+- um motor de consultas otimizado
+- benchmark comparando abordagem lenta e abordagem indexada
+- testes automatizados
+- documentação organizada para facilitar entendimento
+
+## Como usar sem ser técnico
+
+### 1. Abrir o painel
+
+Depois de instalar o projeto, rode:
+
+```bash
+uv run streamlit run app/streamlit_app.py
 ```
 
-Com 100 mil registros isso já leva ~18s. Com 1,2 milhão, passa de 4 minutos.
+O painel abrirá no navegador.
 
----
+### 2. O que dá para fazer no painel
 
-## Algoritmo escolhido — Índice ordenado + Busca binária + Prefix sums
+- usar a base de demonstração que já acompanha o projeto
+- enviar um arquivo real em `CSV` ou `JSON`
+- escolher período de análise
+- filtrar por hub e status
+- ajustar o limite de atraso em minutos
 
-### Pré-processamento (feito uma vez)
+### 3. Como interpretar o dashboard
 
-1. Ordenar os eventos por `timestamp` → **Θ(n log n)**
-2. Para cada fatia relevante (hub, status), construir um vetor de prefix sums sobre `atraso_min` → **Θ(n)**
+**Eventos na janela**  
+Mostra quantos registros existem no período escolhido.
 
-### Consulta (executada repetidamente)
+**Atrasos acima do corte**  
+Mostra quantos eventos ultrapassaram o limite definido.
 
-1. Usar busca binária (`bisect`) para localizar os limites do intervalo de tempo → **Θ(log n)**
-2. Responder com diferença de prefix sums → **Θ(1)**
+**Atraso médio**  
+Resume o tamanho médio dos atrasos naquele recorte.
 
-### Complexidade
+**Pior atraso**  
+Aponta o caso mais crítico encontrado.
 
-| Etapa              | Custo        |
-|--------------------|--------------|
-| Pré-processamento  | Θ(n log n)   |
-| Consulta           | Θ(log n)     |
-| Memória extra      | Θ(n)         |
+**Panorama**  
+Ajuda a entender rapidamente se a operação está estável ou sob pressão.
 
-A ordenação domina o setup. Depois disso, **cada consulta custa Θ(log n)** — ganho expressivo frente ao Θ(n) linear, especialmente com volume alto e consultas repetidas.
+**Hubs críticos**  
+Mostra onde a operação está mais sensível.
 
----
+**Linha do tempo**  
+Permite enxergar quando os problemas aumentam.
 
-## Estrutura
+**Base carregada**  
+Mostra os registros usados e permite baixar o recorte filtrado.
 
-```
+## Ideia central do algoritmo
+
+A abordagem lenta faz o seguinte:
+
+1. lê todos os eventos
+2. percorre tudo a cada consulta
+3. conta manualmente os atrasos
+
+Isso tende a custo **Θ(n)** por consulta.
+
+Neste projeto, a abordagem escolhida:
+
+1. ordena os eventos por tempo
+2. cria índices por tempo, hub e status
+3. usa busca binária para localizar a janela da consulta
+4. usa prefix sums para responder mais rápido
+
+Resultado:
+
+- preparação inicial com custo maior
+- consultas repetidas muito mais rápidas
+- melhor escalabilidade para grandes volumes
+
+## Estrutura do projeto
+
+O código mistura conceitos de **arquitetura limpa** e **arquitetura hexagonal** para ficar mais fácil de manter:
+
+```text
 src/logisticama/
-  domain/        entidades e contratos
+  domain/        regras centrais e contratos
   application/   casos de uso
-  adapters/      ingestão, índice, dashboard
-  shared/        utilitários
+  adapters/      ingestão, índices e interface
+  shared/        utilitários comuns
 app/
-  streamlit_app.py      dashboard
+  streamlit_app.py
 benchmarks/
-  run_benchmarks.py     comparação linear × indexado
+  run_benchmarks.py
 tests/
   test_indexed_repository.py
 ```
 
-**Arquivo central:** [src/logisticama/adapters/persistence/indexed_repository.py](src/logisticama/adapters/persistence/indexed_repository.py)
+## Tecnologias usadas
 
----
+- Python 3.12
+- uv
+- Streamlit
+- pandas
+- numpy
+- plotly
+- pytest
 
-## Setup
+## Setup técnico
+
+### Instalar dependências
 
 ```bash
-uv sync                  # instalar dependências
-uv run pytest            # testes
-uv run streamlit run app/streamlit_app.py   # dashboard
-uv run python benchmarks/run_benchmarks.py --sizes 1000 10000 100000 1000000
+uv sync
 ```
 
----
+### Rodar testes
 
-## Formato do dataset
+```bash
+uv run pytest
+```
+
+### Rodar benchmark
+
+```bash
+uv run python benchmarks/run_benchmarks.py --sizes 1000 10000 100000
+```
+
+### Rodar o dashboard
+
+```bash
+uv run streamlit run app/streamlit_app.py
+```
+
+### Gerar requirements para deploy
+
+```bash
+uv export --no-dev --no-hashes --format requirements-txt > requirements.txt
+```
+
+## Formato esperado do dataset
+
+O projeto espera estas colunas:
+
+- `id`
+- `timestamp`
+- `status`
+- `hub`
+- `atraso_min`
+
+Exemplo:
 
 ```csv
 id,timestamp,status,hub,atraso_min
 LM20260207-00123,2026-02-07T09:15:42-03:00,triagem,Ponta_Areia,0
 ```
 
-Colunas obrigatórias: `id`, `timestamp`, `status`, `hub`, `atraso_min`.
+## Arquivos mais importantes
 
+- `app/streamlit_app.py`: dashboard principal
+- `src/logisticama/adapters/persistence/indexed_repository.py`: motor indexado
+- `benchmarks/run_benchmarks.py`: comparação de desempenho
+- `data/demo/logistica_ma_demo.csv`: base de demonstração
+
+## Próximos passos naturais
+
+- carregar o dataset real da disciplina
+- executar benchmarks com volumes maiores
+- registrar prints do dashboard
+- transformar os resultados em PDF para entrega final
