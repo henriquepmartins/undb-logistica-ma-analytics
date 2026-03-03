@@ -3,165 +3,220 @@ from __future__ import annotations
 import streamlit as st
 
 
-EDITORIAL_THEME = """
+MINIMAL_THEME = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
 :root {
-  --ink: #182433;
-  --sand: #f4efe5;
-  --card: rgba(255, 249, 240, 0.78);
-  --line: rgba(24, 36, 51, 0.14);
-  --accent: #c85c2c;
-  --accent-soft: #f1be94;
-  --accent-dark: #883b18;
-  --forest: #476b5d;
+  --bg: #F7F8F5;
+  --panel: #FFFFFF;
+  --text: #1B242C;
+  --muted: #66727E;
+  --line: #D7DFE5;
+  --blue: #264653;
+  --blue-soft: #9FB5C3;
+  --alert: #C96A4A;
+}
+
+html, body, [class*="css"] {
+  font-family: "IBM Plex Sans", sans-serif;
 }
 
 .stApp {
-  background:
-    radial-gradient(circle at top left, rgba(200, 92, 44, 0.18), transparent 28%),
-    radial-gradient(circle at top right, rgba(71, 107, 93, 0.16), transparent 25%),
-    linear-gradient(180deg, #f6f0e7 0%, #f0e4d3 100%);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
 }
 
 [data-testid="stHeader"] {
-  background: transparent;
+  background: rgba(247, 248, 245, 0.92);
+  border-bottom: 1px solid rgba(215, 223, 229, 0.8);
 }
 
 [data-testid="stSidebar"] {
-  background:
-    linear-gradient(180deg, rgba(24, 36, 51, 0.94), rgba(29, 53, 66, 0.98));
-  border-right: 1px solid rgba(255,255,255,0.08);
+  background: #F3F5F2;
+  border-right: 1px solid var(--line);
 }
 
 [data-testid="stSidebar"] * {
-  color: #f7f1e8;
-  font-family: "Manrope", sans-serif;
+  color: var(--text);
 }
 
-.hero-shell {
-  position: relative;
-  padding: 1.5rem 1.5rem 1.8rem;
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+  color: var(--muted);
+}
+
+[data-testid="stSidebar"] .stRadio,
+[data-testid="stSidebar"] .stSlider,
+[data-testid="stSidebar"] .stSelectbox {
+  background: var(--panel);
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255,255,255,0.66), rgba(250,244,236,0.88));
-  box-shadow: 0 16px 40px rgba(24, 36, 51, 0.09);
-  overflow: hidden;
+  border-radius: 10px;
+  padding: 0.45rem 0.65rem;
 }
 
-.hero-shell::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(24,36,51,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(24,36,51,0.03) 1px, transparent 1px);
-  background-size: 24px 24px;
-  pointer-events: none;
+[data-testid="stSidebar"] .stRadio label {
+  font-size: 0.88rem;
 }
 
-.eyebrow {
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-top: 0.4rem;
+}
+
+[data-testid="stSidebar"] label {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.app-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.top-note,
+.eyebrow,
+.metric-label,
+.section-note,
+.small-note {
   font-family: "IBM Plex Mono", monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: var(--accent-dark);
-  font-size: 0.78rem;
 }
 
-.hero-title {
-  font-family: "Fraunces", serif;
-  color: var(--ink);
-  font-size: clamp(2.1rem, 4vw, 4rem);
-  line-height: 0.95;
-  margin: 0.25rem 0 0.75rem;
-  max-width: 10ch;
-}
-
-.hero-copy {
-  font-family: "Manrope", sans-serif;
-  font-size: 1rem;
-  line-height: 1.6;
-  max-width: 70ch;
-}
-
-.signal-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.8rem;
-  margin-top: 1rem;
-}
-
-.signal-card,
-.metric-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  padding: 1rem;
-  backdrop-filter: blur(10px);
-}
-
-.signal-label,
-.metric-label {
-  font-family: "IBM Plex Mono", monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+.top-note {
+  color: var(--blue);
   font-size: 0.72rem;
-  color: rgba(24, 36, 51, 0.76);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.35rem;
 }
 
-.signal-value,
-.metric-value {
-  font-family: "Fraunces", serif;
-  font-size: 1.8rem;
-  line-height: 1;
-  color: var(--ink);
-  margin-top: 0.35rem;
+.page-title {
+  font-size: clamp(1.45rem, 2.1vw, 1.85rem);
+  line-height: 1.1;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
 }
 
-.metric-note {
-  font-family: "Manrope", sans-serif;
+.page-copy {
+  color: var(--muted);
   font-size: 0.92rem;
-  color: rgba(24, 36, 51, 0.74);
+  line-height: 1.4;
+  max-width: 62rem;
+  margin: 0.35rem 0 0.55rem;
+}
+
+.page-meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin-bottom: 0.95rem;
+}
+
+.metric-card,
+.section-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.metric-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  min-height: 108px;
+}
+
+.narrative-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.85rem 0.95rem;
+  min-height: 176px;
+}
+
+.narrative-card .page-copy {
+  margin-bottom: 0;
+}
+
+.metric-label {
+  color: var(--muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.metric-value {
+  color: var(--text);
+  font-size: 1.55rem;
+  line-height: 1.05;
+  font-weight: 700;
+  margin-top: 0.45rem;
+}
+
+.metric-subtitle {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
   margin-top: 0.35rem;
+}
+
+.section-card {
+  padding: 0.1rem 0 0.3rem;
+  height: auto;
 }
 
 .section-title {
-  font-family: "Fraunces", serif;
-  font-size: 1.55rem;
-  margin: 0.25rem 0 0.4rem;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
 }
 
-.section-copy {
-  font-family: "Manrope", sans-serif;
-  margin-bottom: 0.8rem;
-  max-width: 74ch;
+.section-note {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0.02rem 0 0.45rem;
 }
 
-.callout {
-  border-left: 6px solid var(--accent);
-  padding: 1rem 1rem 1rem 1.25rem;
-  background: rgba(255, 251, 245, 0.82);
-  border-top: 1px solid var(--line);
-  border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  font-family: "Manrope", sans-serif;
-}
-
-.footer-note {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.82rem;
+.small-note {
+  color: var(--muted);
+  font-size: 0.72rem;
   letter-spacing: 0.04em;
-  color: rgba(24, 36, 51, 0.65);
+  margin-top: 0.3rem;
 }
 
-div[data-testid="stMetric"] {
-  background: var(--card);
+.stPlotlyChart {
+  border-top: 1px solid rgba(215, 223, 229, 0.85);
+  padding-top: 0.45rem;
+}
+
+button[kind="primary"],
+.stDownloadButton button,
+.stButton button {
+  background: var(--blue);
+  color: #FFFFFF;
+  border: 1px solid var(--blue);
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+div[data-testid="stAlert"] {
+  border-radius: 10px;
   border: 1px solid var(--line);
-  padding: 1rem;
+}
+
+@media (max-width: 900px) {
+  .metric-card {
+    min-height: auto;
+  }
 }
 </style>
 """
 
 
 def apply_theme() -> None:
-    st.markdown(EDITORIAL_THEME, unsafe_allow_html=True)
+    st.markdown(MINIMAL_THEME, unsafe_allow_html=True)

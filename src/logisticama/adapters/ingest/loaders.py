@@ -7,7 +7,7 @@ from typing import BinaryIO
 
 import pandas as pd
 
-from logisticama.shared.normalization import normalize_logs_frame
+from logisticama.shared.normalization import REQUIRED_COLUMNS, normalize_logs_frame
 
 
 class FileLogSource:
@@ -42,9 +42,15 @@ def _read_any_source(source: str | Path | io.BytesIO, suffix: str) -> pd.DataFra
 
 
 def _read_json(source: str | Path | io.BytesIO) -> pd.DataFrame:
+    frame: pd.DataFrame | None = None
     try:
-        frame = pd.read_json(source, lines=True)
+        candidate = pd.read_json(source, lines=True)
+        if all(column in candidate.columns for column in REQUIRED_COLUMNS):
+            frame = candidate
     except ValueError:
+        frame = None
+
+    if frame is None:
         if isinstance(source, io.BytesIO):
             source.seek(0)
             payload = source.read().decode("utf-8")
@@ -52,5 +58,5 @@ def _read_json(source: str | Path | io.BytesIO) -> pd.DataFrame:
             payload = Path(source).read_text(encoding="utf-8")
         parsed = json.loads(payload)
         frame = pd.DataFrame(parsed)
-    return normalize_logs_frame(frame)
 
+    return normalize_logs_frame(frame)

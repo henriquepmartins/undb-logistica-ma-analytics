@@ -1,0 +1,116 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+
+\title{Relatório Técnico -- Desafio 4.0 (Projeto e Análise de Algoritmos)}
+\author{Equipe LogisticaMA}
+\date{2 de março de 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Este documento descreve a solução desenvolvida para responder consultas do tipo \emph{"quantos pacotes atrasaram mais de 30 minutos em uma janela de tempo"} com tempo de resposta inferior a 3 segundos, mesmo com até dois milhões de eventos. Propõe-se um índice baseado em ordenação temporal e prefix sums por hub e status, reduzindo o custo de consulta de $\Theta(n)$ para $\Theta(\log n)$. São apresentados a modelagem do problema, análise de complexidade temporal e espacial, metodologia experimental, resultados de benchmarks e conclusão sobre a conformidade com o SLA do desafio.
+\end{abstract}
+
+\section{Introdução}
+O desafio consiste em acelerar consultas sobre logs logísticos que, na abordagem ingênua, percorrem toda a base. Em volumetrias acima de $10^6$ registros, o tempo de resposta torna-se incompatível com uso operacional. O objetivo é garantir latência $< 3$ segundos para janelas arbitrárias, mantendo corretude dos resultados quando comparados ao baseline linear.
+
+\section{Requisitos do Desafio}
+\begin{itemize}
+  \item Responder consultas de atraso $> 30$ minutos em janelas de tempo arbitrárias com SLA de 3s até 2M de eventos.
+  \item Permitir filtros por hub e por status (e combinações).
+  \item Manter equivalência de resultados com a contagem linear de referência.
+  \item Disponibilizar benchmark comparativo e dashboard exploratório.
+\end{itemize}
+
+\section{Dataset e Normalização}
+A base oficial localiza-se em \texttt{data/logistica\_ma\_logs.csv}, com colunas obrigatórias \{\texttt{id}, \texttt{timestamp}, \texttt{status}, \texttt{hub}, \texttt{atraso\_min}\}. A normalização converte timestamps para \texttt{timestamp\_epoch} (int64) e cria rótulos legíveis. Ingestões CSV/JSON compartilham o mesmo contrato.
+
+\section{Solução Proposta}
+\subsection{Pré-processamento}
+\begin{enumerate}
+  \item Ordenação estável por \texttt{timestamp\_epoch} (custo $\Theta(n \log n)$).
+  \item Construção de prefix sums: \texttt{delayed\_30\_prefix} para atrasos $>30$, soma acumulada e máximo acumulado de \texttt{atraso\_min} (custo $\Theta(n)$).
+  \item Índices por hub, por status e por par (hub, status), cada um com os vetores acima.
+\end{enumerate}
+
+\subsection{Consulta}
+Dada uma janela \texttt{[start, end]}, aplica-se busca binária para localizar os limites em cada índice ($\Theta(\log n)$) e obtém-se a resposta por diferença de prefix sums ($\Theta(1)$). Para \texttt{min\_delay} diferente de 30, aplica-se varredura vetorial local em \texttt{O(k)} onde $k$ é o tamanho da janela filtrada (restrito ao subconjunto temporal), ainda dominado pela busca.
+
+\section{Análise de Complexidade}
+\subsection{Tempo}
+\begin{itemize}
+  \item Pré-processamento: $\Theta(n \log n)$ (ordenar) + $\Theta(n)$ (prefixos).
+  \item Consulta: $\Theta(\log n)$ para localizar limites + $\Theta(1)$ para diferença; $\Theta(k)$ adicional apenas se \texttt{min\_delay} $\neq 30$ (janela restrita).
+\end{itemize}
+\subsection{Espaço}
+\begin{itemize}
+  \item Vetores adicionais por índice: $\Theta(n)$ no pior caso, proporcional ao número de linhas. Em bytes, 3 vetores int64 por linha (timestamps e prefixos) e um int32 de atraso por linha.
+\end{itemize}
+
+\section{Validação e Testes}
+\begin{itemize}
+  \item \textbf{Corretude de contagem}: comparação índice vs. baseline linear no dataset oficial e em amostras sintéticas.
+  \item \textbf{Filtros}: testes unitários para filtros por hub e por status, além de \texttt{min\_delay} variável.
+  \item \textbf{Dataset}: ingestão CSV/JSON com contrato comum; dataset oficial carregado sem upload manual.
+  \item \textbf{Benchmark CLI}: verificação automática de SLA para $n=2{,}000{,}000$ e checagem de mesma resposta que o baseline.
+\end{itemize}
+
+\section{Metodologia Experimental}
+Os benchmarks utilizam dados sintéticos baseados no perfil real (categorias de hub e status e distribuição de atrasos). Para cada tamanho em \{1k, 10k, 100k, 1M, 2M\}:
+\begin{enumerate}
+  \item Gerar frame sintético com semente fixa.
+  \item Construir índice e medir \texttt{build\_seconds}.
+  \item Medir consulta linear e indexada na mesma janela temporal.
+  \item Verificar igualdade de respostas e calcular speedup.
+  \item Aplicar asserção de SLA (<3s) no maior caso.
+\end{enumerate}
+
+\section{Resultados}
+Resultados da execução de \texttt{uv run python benchmarks/run\_benchmarks.py} (02/03/2026):
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{@{}rccccr@{}}
+    \toprule
+    $n$ & build (s) & linear (s) & indexado (s) & speedup ($\times$) & mesma resposta \\
+    \midrule
+    1{,}000    & 0.003221 & 0.000043 & 0.000014 & 2.98  & sim \\
+    10{,}000   & 0.005407 & 0.000408 & 0.000013 & 31.55 & sim \\
+    100{,}000  & 0.047054 & 0.004412 & 0.000019 & 232.73 & sim \\
+    1{,}000{,}000 & 0.597807 & 0.042632 & 0.000029 & 1461.65 & sim \\
+    2{,}000{,}000 & 1.179973 & 0.085782 & 0.000055 & 1571.59 & sim \\
+    \bottomrule
+  \end{tabular}
+  \caption{Benchmark sintético com perfil real. O caso de 2M satisfaz SLA de 3s.}
+\end{table}
+
+\section{Conclusões}
+A estrutura indexada reduz o custo de consulta de $\Theta(n)$ para $\Theta(\log n)$, permitindo respostas sub-milisegundo mesmo com 2M eventos sintéticos, atendendo o SLA de 3 segundos com ampla folga. Testes automatizados confirmam equivalência com o baseline linear e cobertura de filtros por hub, status e limiares de atraso variáveis.
+
+\section{Trabalho Futuro}
+\begin{itemize}
+  \item Persistir índices em disco para reuso entre execuções.
+  \item Adicionar estimativas de uso de memória por tamanho de dataset.
+  \item Explorar paralelização na construção dos índices por hub/status.
+\end{itemize}
+
+\section{Como Executar}
+\begin{enumerate}
+  \item Instalar dependências: \texttt{uv sync}
+  \item Testes: \texttt{uv run pytest}
+  \item Benchmarks (com SLA): \texttt{uv run python benchmarks/run\_benchmarks.py}
+  \item Dashboard: \texttt{uv run streamlit run app/streamlit\_app.py}
+\end{enumerate}
+
+\end{document}

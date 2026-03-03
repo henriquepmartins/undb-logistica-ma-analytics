@@ -43,3 +43,30 @@ def test_hub_filtered_summary() -> None:
     assert summary["total_events"] == 2
     assert summary["delayed_events"] == 2
     assert summary["max_delay"] == 75
+
+
+def test_status_filtered_summary() -> None:
+    frame = sample_frame()
+    repo = IndexedLogRepository(frame)
+    roteirizado_frame = frame[frame["status"] == "roteirizado"]
+    start_ts = int(roteirizado_frame["timestamp_epoch"].min())
+    end_ts = int(roteirizado_frame["timestamp_epoch"].max())
+
+    summary = repo.summarize_window(
+        TimeRangeQuery(start_ts=start_ts, end_ts=end_ts, min_delay=30, status="roteirizado")
+    )
+
+    assert summary["total_events"] == 1
+    assert summary["delayed_events"] == 1
+    assert summary["max_delay"] == 75
+
+
+def test_min_delay_variation_count() -> None:
+    frame = sample_frame()
+    repo = IndexedLogRepository(frame)
+    start_ts = int(frame["timestamp_epoch"].min())
+    end_ts = int(frame["timestamp_epoch"].max())
+
+    count_over_60 = repo.count_delays(TimeRangeQuery(start_ts=start_ts, end_ts=end_ts, min_delay=60))
+
+    assert count_over_60 == 1

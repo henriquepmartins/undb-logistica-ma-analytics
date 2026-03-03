@@ -1,65 +1,37 @@
 from __future__ import annotations
 
 import argparse
-import time
-
-import numpy as np
 import pandas as pd
 
-from logisticama.adapters.persistence.indexed_repository import IndexedLogRepository, linear_delay_count
-from logisticama.domain.ports import TimeRangeQuery
-from logisticama.shared.normalization import normalize_logs_frame
+from logisticama.application.benchmarking import DEFAULT_BENCHMARK_SIZES, benchmark_cases
 
 
-HUBS = ["Ponta_Areia", "Raposa", "Paco_do_Lumiar", "Alcantara", "Centro", "Cohama", "Maiobao", "Anjo_da_Guarda"]
-STATUSES = ["coleta", "triagem", "roteirizado", "saiu_para_entrega", "entregue", "atrasado"]
-
-
-def generate_frame(size: int) -> pd.DataFrame:
-    rng = np.random.default_rng(42)
-    timestamps = pd.date_range("2026-02-01", periods=size, freq="s", tz="America/Fortaleza")
-    frame = pd.DataFrame(
-        {
-            "id": [f"LM20260201-{i:07d}" for i in range(size)],
-            "timestamp": timestamps.astype(str),
-            "status": rng.choice(STATUSES, size=size),
-            "hub": rng.choice(HUBS, size=size),
-            "atraso_min": rng.integers(0, 90, size=size),
-        }
-    )
-    return normalize_logs_frame(frame)
-
-
-def benchmark(size: int) -> dict[str, float | int]:
-    frame = generate_frame(size)
-    repository = IndexedLogRepository(frame)
-    records = frame.to_dict("records")
-    start_ts = int(frame["timestamp_epoch"].iloc[size // 4])
-    end_ts = int(frame["timestamp_epoch"].iloc[min(size - 1, size // 4 + size // 2)])
-
-    linear_start = time.perf_counter()
-    linear_result = linear_delay_count(records, start_ts, end_ts, 30)
-    linear_time = time.perf_counter() - linear_start
-
-    indexed_start = time.perf_counter()
-    indexed_result = repository.count_delays(TimeRangeQuery(start_ts=start_ts, end_ts=end_ts, min_delay=30))
-    indexed_time = time.perf_counter() - indexed_start
-
-    return {
-        "n": size,
-        "linear_seconds": round(linear_time, 6),
-        "indexed_seconds": round(indexed_time, 6),
-        "speedup_x": round(linear_time / max(indexed_time, 1e-9), 2),
-        "same_answer": linear_result == indexed_result,
-    }
-
-
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Benchmarks do motor LogisticaMA.")
-    parser.add_argument("--sizes", nargs="+", type=int, default=[1_000, 10_000, 100_000])
-    args = parser.parse_args()
+    parser.add_argument("--sizes", nargs="+", type=int, default=list(DEFAULT_BENCHMARK_SIZES))
+    return parser
 
-    results = [benchmark(size) for size in args.sizes]
+
+def _assert_sla(results: pd.DataFrame, sla_seconds: float = 3.0, target_size: int = 2_000_000) -> None:
+    if "n" not in results.columns or "indexed_query_seconds" not in results.columns:
+        return
+    if target_size not in results["n"].values:
+        return
+    row = results.loc[results["n"] == target_size].iloc[0]
+    indexed_seconds = float(row["indexed_query_seconds"])
+    if indexed_seconds >= sla_seconds:
+        raise AssertionError(
+            f"SLA de {sla_seconds}s não atingido para n={target_size}: indexado={indexed_seconds:.4f}s"
+        )
+    if "same_answer" in results.columns and not bool(row["same_answer"]):
+        raise AssertionError("Resultado indexado diverge do baseline no maior cenário")
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    results = benchmark_cases(tuple(args.sizes))
+    _assert_sla(results)
     print(pd.DataFrame(results).to_string(index=False))
 
 

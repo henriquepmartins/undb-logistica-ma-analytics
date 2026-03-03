@@ -17,6 +17,8 @@ Este projeto propõe uma solução computacional para o problema de consulta efi
 
 O sistema inclui um motor de consulta indexado, benchmarks comparativos e um dashboard interativo desenvolvido em Streamlit.
 
+Base oficial local do projeto: `data/logistica_ma_logs.csv`.
+
 ## Contexto do Problema
 
 A abordagem original percorre todos os registros a cada consulta, resultando em custo linear **O(n)**. Em ambiente de testes, o comportamento é o seguinte:
@@ -91,21 +93,32 @@ uv sync
 # executar testes
 uv run pytest
 
-# iniciar dashboard
+# iniciar dashboard com a base oficial local por padrão
 uv run streamlit run app/streamlit_app.py
 
-# executar benchmarks
-uv run python benchmarks/run_benchmarks.py --sizes 1000 10000 100000 1000000
+# executar benchmarks oficiais do desafio
+uv run python benchmarks/run_benchmarks.py
+
+# executar benchmarks com tamanhos customizados
+uv run python benchmarks/run_benchmarks.py --sizes 1000 10000 100000 1000000 2000000
 ```
 
+O benchmark padrão cobre `10^3`, `10^4`, `10^5`, `10^6` e a checagem de pico em `2 * 10^6`, reportando separadamente o custo de construção do índice (`build_seconds`) e o tempo de consulta linear/indexada.
+
 ## Formato do Dataset
+
+O projeto aceita ingestão em `CSV` e `JSON`, desde que o arquivo preserve o contrato abaixo:
+
+Colunas obrigatórias: `id`, `timestamp`, `status`, `hub`, `atraso_min`.
+
+Exemplo:
 
 ```csv
 id,timestamp,status,hub,atraso_min
 LM20260207-00123,2026-02-07T09:15:42-03:00,triagem,Ponta_Areia,0
 ```
 
-Colunas obrigatórias: `id`, `timestamp`, `status`, `hub`, `atraso_min`.
+Sem upload manual, o dashboard usa a base oficial local `data/logistica_ma_logs.csv`.
 
 Dataset fornecido pela disciplina: [Google Drive](https://drive.google.com/drive/folders/19-pRmLe-V4rKv2VeuvytIGja6qm5zybJ)
 
