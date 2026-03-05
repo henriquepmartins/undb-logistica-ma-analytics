@@ -11,6 +11,7 @@ from logisticama.adapters.ingest.loaders import FileLogSource, UploadedLogSource
 from logisticama.adapters.persistence.indexed_repository import IndexedLogRepository, linear_delay_count
 from logisticama.application.benchmarking import (
     DEFAULT_BENCHMARK_SIZES,
+    benchmark_cases,
     benchmark_real_case,
     generate_benchmark_frame,
     load_benchmark_profile,
@@ -76,6 +77,13 @@ def test_official_dataset_loads_without_upload() -> None:
 
     assert not frame.empty
     assert NORMALIZED_COLUMNS.issubset(frame.columns)
+
+
+def test_timestamp_epoch_matches_timezone_aware_timestamp_seconds() -> None:
+    frame = load_official_frame().head(25)
+    expected = frame["timestamp"].map(lambda value: int(value.timestamp()))
+
+    assert frame["timestamp_epoch"].tolist() == expected.tolist()
 
 
 def test_csv_and_json_ingestion_share_the_same_contract(tmp_path) -> None:
@@ -177,12 +185,30 @@ def test_real_case_benchmark_matches_manual_count() -> None:
     assert result.same_answer is True
     assert result.total_events == int(manual_mask.sum())
     assert result.delayed_events == manual_delayed
+    assert result.linear_runs > 0
+    assert result.indexed_runs > 0
+    assert result.linear_query_seconds > 0
+    assert result.indexed_query_seconds > 0
+
+
+def test_benchmark_frame_exposes_runtime_metadata() -> None:
+    frame = benchmark_cases((1_000, 10_000))
+
+    assert {"linear_runs", "indexed_runs"}.issubset(frame.columns)
+    assert (frame["linear_runs"] > 0).all()
+    assert (frame["indexed_runs"] > 0).all()
+    assert (frame["linear_query_seconds"] > 0).all()
+    assert (frame["indexed_query_seconds"] > 0).all()
 
 
 def test_streamlit_app_uses_hardcoded_base_and_has_no_uploader() -> None:
     contents = STREAMLIT_APP_PATH.read_text(encoding="utf-8")
 
     assert "file_uploader" not in contents
+    assert "st.sidebar" not in contents
+    assert "st.tabs(" in contents
     assert "load_official_frame" in contents
     assert "PAGE_OPERATION" in contents
     assert "PAGE_BENCHMARK" in contents
+    assert "μs" in contents
+    assert "Resumo do algoritmo novo" in contents

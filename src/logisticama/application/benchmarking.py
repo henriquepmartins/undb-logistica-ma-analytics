@@ -13,6 +13,8 @@ from logisticama.shared.normalization import normalize_logs_frame
 
 
 DEFAULT_BENCHMARK_SIZES = (1_000, 10_000, 100_000, 1_000_000, 2_000_000)
+LINEAR_BENCHMARK_RUNS = 5
+INDEXED_BENCHMARK_RUNS = 200
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +35,8 @@ class RealCaseBenchmark:
     build_seconds: float
     linear_query_seconds: float
     indexed_query_seconds: float
+    linear_runs: int
+    indexed_runs: int
     speedup_x: float
     same_answer: bool
 
@@ -67,6 +71,13 @@ def generate_benchmark_frame(size: int, profile: BenchmarkProfile | None = None)
     return normalize_logs_frame(frame)
 
 
+def average_query_seconds(callback, runs: int) -> float:
+    start = time.perf_counter()
+    for _ in range(runs):
+        callback()
+    return (time.perf_counter() - start) / runs
+
+
 def benchmark_case(size: int, profile: BenchmarkProfile | None = None) -> dict[str, float | int | bool]:
     frame = generate_benchmark_frame(size, profile=profile)
 
@@ -79,19 +90,24 @@ def benchmark_case(size: int, profile: BenchmarkProfile | None = None) -> dict[s
     end_ts = int(frame["timestamp_epoch"].iloc[min(size - 1, size // 4 + size // 2)])
     query = TimeRangeQuery(start_ts=start_ts, end_ts=end_ts, min_delay=30)
 
-    linear_start = time.perf_counter()
     linear_result = linear_delay_count(records, start_ts, end_ts, 30)
-    linear_query_seconds = time.perf_counter() - linear_start
-
-    indexed_start = time.perf_counter()
     indexed_result = repository.count_delays(query)
-    indexed_query_seconds = time.perf_counter() - indexed_start
+    linear_query_seconds = average_query_seconds(
+        lambda: linear_delay_count(records, start_ts, end_ts, 30),
+        LINEAR_BENCHMARK_RUNS,
+    )
+    indexed_query_seconds = average_query_seconds(
+        lambda: repository.count_delays(query),
+        INDEXED_BENCHMARK_RUNS,
+    )
 
     return {
         "n": size,
         "build_seconds": round(build_seconds, 6),
         "linear_query_seconds": round(linear_query_seconds, 6),
         "indexed_query_seconds": round(indexed_query_seconds, 6),
+        "linear_runs": LINEAR_BENCHMARK_RUNS,
+        "indexed_runs": INDEXED_BENCHMARK_RUNS,
         "speedup_x": round(linear_query_seconds / max(indexed_query_seconds, 1e-9), 2),
         "same_answer": linear_result == indexed_result,
     }
@@ -120,13 +136,16 @@ def benchmark_real_case(frame: pd.DataFrame | None = None, min_delay: int = 30) 
     build_seconds = time.perf_counter() - build_start
 
     records = ordered.to_dict("records")
-    linear_start = time.perf_counter()
     delayed_events = linear_delay_count(records, start_ts, end_ts, min_delay)
-    linear_query_seconds = time.perf_counter() - linear_start
-
-    indexed_start = time.perf_counter()
     indexed_events = repository.count_delays(query)
-    indexed_query_seconds = time.perf_counter() - indexed_start
+    linear_query_seconds = average_query_seconds(
+        lambda: linear_delay_count(records, start_ts, end_ts, min_delay),
+        LINEAR_BENCHMARK_RUNS,
+    )
+    indexed_query_seconds = average_query_seconds(
+        lambda: repository.count_delays(query),
+        INDEXED_BENCHMARK_RUNS,
+    )
 
     window_mask = (ordered["timestamp_epoch"] >= start_ts) & (ordered["timestamp_epoch"] <= end_ts)
     start_label = ordered["timestamp_label"].iloc[start_index].strftime("%d/%m/%Y %H:%M")
@@ -141,6 +160,8 @@ def benchmark_real_case(frame: pd.DataFrame | None = None, min_delay: int = 30) 
         build_seconds=round(build_seconds, 6),
         linear_query_seconds=round(linear_query_seconds, 6),
         indexed_query_seconds=round(indexed_query_seconds, 6),
+        linear_runs=LINEAR_BENCHMARK_RUNS,
+        indexed_runs=INDEXED_BENCHMARK_RUNS,
         speedup_x=round(linear_query_seconds / max(indexed_query_seconds, 1e-9), 2),
         same_answer=delayed_events == indexed_events,
     )

@@ -32,47 +32,22 @@ html, body, [class*="css"] {
   border-bottom: 1px solid rgba(215, 223, 229, 0.8);
 }
 
-[data-testid="stSidebar"] {
-  background: #F3F5F2;
-  border-right: 1px solid var(--line);
-}
-
-[data-testid="stSidebar"] * {
-  color: var(--text);
-}
-
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
-  color: var(--muted);
-}
-
-[data-testid="stSidebar"] .stRadio,
-[data-testid="stSidebar"] .stSlider,
-[data-testid="stSidebar"] .stSelectbox {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.45rem 0.65rem;
-}
-
-[data-testid="stSidebar"] .stRadio label {
-  font-size: 0.88rem;
-}
-
-[data-testid="stSidebar"] h2,
-[data-testid="stSidebar"] h3 {
-  font-size: 0.88rem;
-  font-weight: 700;
-  margin-top: 0.4rem;
-}
-
-[data-testid="stSidebar"] label {
-  font-size: 0.86rem;
-  font-weight: 600;
+[data-testid="stSidebar"],
+[data-testid="stSidebarCollapsedControl"],
+button[kind="header"][aria-label*="sidebar"],
+button[kind="header"][aria-label*="Sidebar"] {
+  display: none !important;
 }
 
 .app-shell {
   max-width: 1180px;
   margin: 0 auto;
+}
+
+.tab-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-bottom: 1rem;
 }
 
 .top-note,
@@ -124,20 +99,54 @@ html, body, [class*="css"] {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 0.75rem 0.85rem;
-  min-height: 108px;
+  padding: 0.9rem 1rem;
+  min-height: 136px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
 }
 
 .narrative-card {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 0.85rem 0.95rem;
+  padding: 0.95rem 1.05rem;
   min-height: 176px;
 }
 
 .narrative-card .page-copy {
   margin-bottom: 0;
+}
+
+.method-card,
+.filter-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.95rem 1rem;
+}
+
+.method-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.65rem;
+}
+
+.method-step {
+  border: 1px solid rgba(215, 223, 229, 0.85);
+  border-radius: 10px;
+  padding: 0.8rem 0.85rem;
+  background: rgba(159, 181, 195, 0.08);
+}
+
+.method-step strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.84rem;
+  margin-bottom: 0.22rem;
 }
 
 .metric-label {
@@ -152,14 +161,15 @@ html, body, [class*="css"] {
   font-size: 1.55rem;
   line-height: 1.05;
   font-weight: 700;
-  margin-top: 0.45rem;
+  margin-top: 0.5rem;
 }
 
 .metric-subtitle {
   color: var(--muted);
   font-size: 0.84rem;
   line-height: 1.35;
-  margin-top: 0.35rem;
+  margin-top: 0.45rem;
+  max-width: 18rem;
 }
 
 .section-card {
@@ -194,6 +204,36 @@ html, body, [class*="css"] {
   padding-top: 0.45rem;
 }
 
+[data-baseweb="tab-list"] {
+  gap: 0.6rem;
+  margin: 0.8rem auto 1rem;
+}
+
+[data-baseweb="tab"] {
+  height: 42px;
+  border-radius: 999px;
+  padding: 0 1rem;
+  background: rgba(159, 181, 195, 0.12);
+  border: 1px solid transparent;
+}
+
+[aria-selected="true"][data-baseweb="tab"] {
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+.stSlider, .stSelectbox {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.25rem 0.7rem 0.55rem;
+}
+
+.stSlider label, .stSelectbox label {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 button[kind="primary"],
 .stDownloadButton button,
 .stButton button {
@@ -212,6 +252,10 @@ div[data-testid="stAlert"] {
 @media (max-width: 900px) {
   .metric-card {
     min-height: auto;
+  }
+
+  .method-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

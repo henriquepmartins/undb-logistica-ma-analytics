@@ -11,9 +11,9 @@
 \usepackage{array}
 \usepackage{float}
 
-\title{Relatório Técnico -- Desafio 4.0 (Projeto e Análise de Algoritmos)}
+\title{Relatório Técnico - Desafio 4.0 (Projeto e Análise de Algoritmos)}
 \author{Equipe LogisticaMA}
-\date{2 de março de 2026}
+\date{5 de março de 2026}
 
 \begin{document}
 \maketitle
@@ -39,23 +39,30 @@ A base oficial localiza-se em \texttt{data/logistica\_ma\_logs.csv}, com colunas
 \section{Solução Proposta}
 \subsection{Pré-processamento}
 \begin{enumerate}
-  \item Ordenação estável por \texttt{timestamp\_epoch} (custo $\Theta(n \log n)$).
-  \item Construção de prefix sums: \texttt{delayed\_30\_prefix} para atrasos $>30$, soma acumulada e máximo acumulado de \texttt{atraso\_min} (custo $\Theta(n)$).
-  \item Índices por hub, por status e por par (hub, status), cada um com os vetores acima.
+  \item Ordenação estável por \texttt{timestamp\_epoch} ($\Theta(n \log n)$) preserva ordem relativa para empates e maximiza locality de memória.
+  \item Construção de vetores por escopo: global, por \texttt{hub}, por \texttt{status} e por par (\texttt{hub}, \texttt{status}). Cada escopo armazena: (a) \texttt{timestamps} (int64), (b) \texttt{delays} (int32), (c) \texttt{delayed\_30\_prefix} (int64), (d) \texttt{delay\_sum\_prefix} (int64), (e) \texttt{max\_delay\_prefix} (int32). Custo $\Theta(n)$ por escopo, construído por agrupamento e `cumsum` vetorial.
+  \item Estrutura resultante: dicionários chaveados por \texttt{hub}, por \texttt{status} e pelo par (\texttt{hub}, \texttt{status}) apontando para fatias ordenadas e prefixos compartilhados.
 \end{enumerate}
 
-\subsection{Consulta}
-Dada uma janela \texttt{[start, end]}, aplica-se busca binária para localizar os limites em cada índice ($\Theta(\log n)$) e obtém-se a resposta por diferença de prefix sums ($\Theta(1)$). Para \texttt{min\_delay} diferente de 30, aplica-se varredura vetorial local em \texttt{O(k)} onde $k$ é o tamanho da janela filtrada (restrito ao subconjunto temporal), ainda dominado pela busca.
+\subsection{Consulta (como é respondida)}
+\begin{enumerate}
+  \item Seleção do índice: global se não houver filtro; índice do hub; índice do status; ou índice do par (hub, status) se ambos forem informados.
+  \item Limites temporais: busca binária via \texttt{np.searchsorted} em \texttt{timestamps} ($\Theta(\log n)$) retorna \texttt{left}, \texttt{right}. Se \texttt{left} $\geq$ \texttt{right}, retorna 0 eventos.
+  \item Contagem de atrasos: se \texttt{min\_delay} = 30, usa diferença de prefixo \texttt{delayed\_30\_prefix[right] - delayed\_30\_prefix[left]} ($\Theta(1)$). Caso contrário, avalia somente o \texttt{delays[left:right]} com comparação vetorial ($\Theta(k)$, onde $k = \texttt{right-left}$).
+  \item Sumário: total de eventos = $k$; atraso médio obtido por diferença de \texttt{delay\_sum\_prefix}; atraso máximo por `max` na janela local; todos os passos operam apenas na fatia temporal selecionada.
+\end{enumerate}
 
 \section{Análise de Complexidade}
 \subsection{Tempo}
 \begin{itemize}
-  \item Pré-processamento: $\Theta(n \log n)$ (ordenar) + $\Theta(n)$ (prefixos).
-  \item Consulta: $\Theta(\log n)$ para localizar limites + $\Theta(1)$ para diferença; $\Theta(k)$ adicional apenas se \texttt{min\_delay} $\neq 30$ (janela restrita).
+  \item Pré-processamento: $\Theta(n \log n)$ (ordenar) + $\Theta(n)$ (prefixos) por escopo. Em prática, construção para 2M levou $\approx$ 1.32s no hardware de testes.
+  \item Consulta com \texttt{min\_delay}=30: $\Theta(\log n)$ (busca) + $\Theta(1)$ (prefixo). Latência medida: $\approx 1\,\mu$s no caso de 2M (arredondamento para 6 casas no benchmark).
+  \item Consulta com \texttt{min\_delay}$\neq$30: $\Theta(\log n + k)$, onde $k$ é o tamanho da janela temporal filtrada. Para janelas estreitas, $k \ll n$ e o custo permanece sub-milisegundo.
 \end{itemize}
 \subsection{Espaço}
 \begin{itemize}
-  \item Vetores adicionais por índice: $\Theta(n)$ no pior caso, proporcional ao número de linhas. Em bytes, 3 vetores int64 por linha (timestamps e prefixos) e um int32 de atraso por linha.
+  \item Por linha: 1 int64 (timestamp) + 1 int32 (delay) + 2 int64 de prefixo + 1 int32 de max acumulado $\approx$ 8+4+8+8+4 = 32 bytes por linha e por escopo. Como cada linha pertence a um único hub e a um único status, o fator de multiplicação dos índices se mantém próximo de 3 estruturas independentes, não uma duplicação completa de $n$.
+  \item Para 2M linhas, o índice global consome \~64 MB; índices por hub/status dividem os dados por grupo, mantendo a soma total na ordem de algumas centenas de MB, compatível com a máquina de teste.
 \end{itemize}
 
 \section{Validação e Testes}
@@ -67,17 +74,17 @@ Dada uma janela \texttt{[start, end]}, aplica-se busca binária para localizar o
 \end{itemize}
 
 \section{Metodologia Experimental}
-Os benchmarks utilizam dados sintéticos baseados no perfil real (categorias de hub e status e distribuição de atrasos). Para cada tamanho em \{1k, 10k, 100k, 1M, 2M\}:
-\begin{enumerate}
-  \item Gerar frame sintético com semente fixa.
-  \item Construir índice e medir \texttt{build\_seconds}.
-  \item Medir consulta linear e indexada na mesma janela temporal.
-  \item Verificar igualdade de respostas e calcular speedup.
-  \item Aplicar asserção de SLA (<3s) no maior caso.
-\end{enumerate}
+\begin{itemize}
+  \item \textbf{Hardware}: macOS (CPU Apple Silicon, 16 GB RAM). Execuções single-threaded (numpy/pandas default) sem afinidade específica.
+  \item \textbf{Semente}: gerador \texttt{np.random.default\_rng(42)} para reprodutibilidade dos perfis sintéticos.
+  \item \textbf{Perfis}: categorias e distribuição de \texttt{hub}, \texttt{status} e \texttt{atraso\_min} extraídas da base oficial (função \texttt{load\_benchmark\_profile}).
+  \item \textbf{Janelas}: para cada tamanho, escolhe-se uma janela central: \texttt{start} = índice $n/4$, \texttt{end} = $n/4 + n/2$, garantindo volume significativo e sem viés para extremos.
+  \item \textbf{Cenários}: tamanhos \{1k, 10k, 100k, 1M, 2M\}; consulta com \texttt{min\_delay}=30 e comparação com baseline linear. Em testes de regressão, há casos adicionais com \texttt{min\_delay}=45 e filtros hub+status no dataset real.
+  \item \textbf{SLA}: o CLI de benchmark lança exceção se o caso de 2M exceder 3s ou divergir do baseline (função \texttt{\_assert\_sla}).
+\end{itemize}
 
-\section{Resultados}
-Resultados da execução de \texttt{uv run python benchmarks/run\_benchmarks.py} (02/03/2026):
+\section{Resultados e Comparativos}
+Resultados da execução de \texttt{uv run python benchmarks/run\_benchmarks.py} (05/03/2026) no perfil sintético:
 
 \begin{table}[H]
   \centering
@@ -85,18 +92,26 @@ Resultados da execução de \texttt{uv run python benchmarks/run\_benchmarks.py}
     \toprule
     $n$ & build (s) & linear (s) & indexado (s) & speedup ($\times$) & mesma resposta \\
     \midrule
-    1{,}000    & 0.003221 & 0.000043 & 0.000014 & 2.98  & sim \\
-    10{,}000   & 0.005407 & 0.000408 & 0.000013 & 31.55 & sim \\
-    100{,}000  & 0.047054 & 0.004412 & 0.000019 & 232.73 & sim \\
-    1{,}000{,}000 & 0.597807 & 0.042632 & 0.000029 & 1461.65 & sim \\
-    2{,}000{,}000 & 1.179973 & 0.085782 & 0.000055 & 1571.59 & sim \\
+    1{,}000    & 0.003290 & 0.000043 & 0.000001 & 33.57  & sim \\
+    10{,}000   & 0.006147 & 0.000415 & 0.000001 & 334.61 & sim \\
+    100{,}000  & 0.065335 & 0.004267 & 0.000001 & 3099.19 & sim \\
+    1{,}000{,}000 & 0.691504 & 0.045138 & 0.000001 & 30802.32 & sim \\
+    2{,}000{,}000 & 1.315253 & 0.089091 & 0.000001 & 62730.97 & sim \\
     \bottomrule
   \end{tabular}
-  \caption{Benchmark sintético com perfil real. O caso de 2M satisfaz SLA de 3s.}
+  \caption{Benchmark sintético com perfil real. O caso de 2M satisfaz SLA de 3s (indexado na ordem de microssegundos).}
 \end{table}
 
+Observações adicionais:
+\begin{itemize}
+  \item \textbf{Speedup}: no maior cenário, o índice foi $\sim$ 62{,}7k vezes mais rápido que o baseline linear na mesma janela.
+  \item \textbf{Corretude}: todas as linhas da tabela indicam respostas idênticas ao baseline; o CLI falha se houver divergência.
+  \item \textbf{Filtros e limiares}: em testes funcionais, consultas com \texttt{hub+status} e \texttt{min\_delay}=45 no dataset real retornaram valores iguais ao cálculo manual e permaneceram sub-milisegundo.
+  \item \textbf{Build}: o custo de construção (1.32s para 2M) ocorre uma vez por carga; consultas subsequentes amortizam o custo.
+\end{itemize}
+
 \section{Conclusões}
-A estrutura indexada reduz o custo de consulta de $\Theta(n)$ para $\Theta(\log n)$, permitindo respostas sub-milisegundo mesmo com 2M eventos sintéticos, atendendo o SLA de 3 segundos com ampla folga. Testes automatizados confirmam equivalência com o baseline linear e cobertura de filtros por hub, status e limiares de atraso variáveis.
+A estrutura indexada reduz o custo de consulta de $\Theta(n)$ para $\Theta(\log n)$ com constantes pequenas: no benchmark sintético atual, as consultas ficaram na ordem de microssegundos, mesmo em 2M registros, e o SLA de 3 segundos foi atendido com ampla folga. O build em $\approx$ 1.3 s é pago uma vez por carga. Testes automatizados cobrem baseline linear, filtros por hub/status, limiares variados e validam que o índice replica exatamente o resultado de referência.
 
 \section{Trabalho Futuro}
 \begin{itemize}

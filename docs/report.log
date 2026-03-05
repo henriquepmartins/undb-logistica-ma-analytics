@@ -1,9 +1,9 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025/Homebrew) (preloaded format=pdflatex 2025.10.11)  2 MAR 2026 22:44
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025/Homebrew) (preloaded format=pdflatex 2025.10.11)  5 MAR 2026 14:23
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
-**docs/report.tex
-(./docs/report.tex
+**report.tex
+(./report.tex
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
 
@@ -392,8 +392,7 @@ Package: float 2001/11/08 v1.3d Float enhancements (AL)
 File: l3backend-pdftex.def 2024-05-08 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count304
 \l__pdf_internal_box=\box58
-)
-No file report.aux.
+) (./report.aux)
 \openout1 = `report.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 18.
@@ -414,6 +413,7 @@ LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 18.
 LaTeX Font Info:    ... okay on input line 18.
 LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 18.
 LaTeX Font Info:    ... okay on input line 18.
+
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
 *geometry* verbose mode - [ preamble ] result:
@@ -476,6 +476,7 @@ File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Liv
 e
 ))
 Package hyperref Info: Link coloring OFF on input line 18.
+ (./report.out) (./report.out)
 \@outlinefile=\write3
 \openout3 = `report.out'.
 
@@ -495,41 +496,68 @@ ch
 ap/pdftex.map}{/opt/homebrew/Cellar/texlive/20250308_1/share/texmf-dist/fonts/e
 nc/dvips/cm-super/cm-super-t1.enc}{/opt/homebrew/Cellar/texlive/20250308_1/shar
 e/texmf-dist/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
+Overfull \hbox (23.68237pt too wide) in paragraph at lines 43--44
+\T1/cmr/m/n/12 Cada es-copo ar-ma-zena: (a) \T1/cmtt/m/n/12 timestamps \T1/cmr/
+m/n/12 (int64), (b) \T1/cmtt/m/n/12 delays \T1/cmr/m/n/12 (int32), (c) \T1/cmtt
+/m/n/12 delayed_30_prefix
+ []
+
+
+Overfull \hbox (38.62743pt too wide) in paragraph at lines 51--52
+[]\T1/cmr/m/n/12 Contagem de atra-sos: se \T1/cmtt/m/n/12 min_delay \T1/cmr/m/n
+/12 = 30, usa di-fe-rença de pre-fixo \T1/cmtt/m/n/12 delayed_30_prefix[right]
+ []
+
+
+Overfull \hbox (30.951pt too wide) in paragraph at lines 51--52
+\T1/cmtt/m/n/12 - delayed_30_prefix[left] \T1/cmr/m/n/12 ($\OT1/cmr/m/n/12 ^^B(
+1)$\T1/cmr/m/n/12 ). Caso con-trá-rio, ava-lia so-mente o \T1/cmtt/m/n/12 delay
+s[left:right]
+ []
+
+
+Overfull \hbox (0.92886pt too wide) in paragraph at lines 52--53
+[]\T1/cmr/m/n/12 Sumário: to-tal de even-tos = $\OML/cmm/m/it/12 k$\T1/cmr/m/n/
+12 ; atraso mé-dio ob-tido por di-fe-rença de \T1/cmtt/m/n/12 delay_sum_prefix\
+T1/cmr/m/n/12 ;
+ []
+
+
 
 [2]
+Overfull \hbox (6.29024pt too wide) in paragraph at lines 82--83
+\T1/cmr/m/n/12 ra-ção com ba-se-line li-near. Em tes-tes de re-gres-são, há ca-
+sos adi-ci-o-nais com \T1/cmtt/m/n/12 min_delay\T1/cmr/m/n/12 =45
+ []
 
-[3
+
+
+[3]
+
+[4
 pdfTeX warning (ext4): destination with the same identifier (name{table.1}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.112   \item B
-               enchmarks (com SLA): \texttt{uv run python benchmarks/run\_be...
-]
+l.126   \item T
+               estes: \texttt{uv run pytest}]
 
-[4] (docs/report.aux)
+[5] (./report.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
-
-
-Package rerunfilecheck Warning: File `report.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `report.out':
-(rerunfilecheck)             Before: <no file>
-(rerunfilecheck)             After:  886352ED964D981E9C1C624A6AE32DD6;1871.
+Package rerunfilecheck Info: File `report.out' has not changed.
+(rerunfilecheck)             Checksum: F7440B7A8BF275576852F0149AC94A6B;2070.
  ) 
 Here is how much of TeX's memory you used:
- 11130 strings out of 473190
- 175787 string characters out of 5704334
- 595003 words of memory out of 5000000
- 34226 multiletter control sequences out of 15000+600000
- 573042 words of font info for 69 fonts, out of 8000000 for 9000
+ 11161 strings out of 473190
+ 176135 string characters out of 5704334
+ 595073 words of memory out of 5000000
+ 34249 multiletter control sequences out of 15000+600000
+ 575198 words of font info for 73 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 75i,9n,79p,638b,544s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 75i,9n,79p,633b,544s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </opt/homebrew/Cellar/texlive/20250308_1/share/texmf-dist/fonts/type1/public/
 amsfonts/cm/cmmi10.pfb></opt/homebrew/Cellar/texlive/20250308_1/share/texmf-dis
 t/fonts/type1/public/amsfonts/cm/cmmi12.pfb></opt/homebrew/Cellar/texlive/20250
@@ -551,10 +579,10 @@ blic/cm-super/sfrm1440.pfb></opt/homebrew/Cellar/texlive/20250308_1/share/texmf
 250308_1/share/texmf-dist/fonts/type1/public/cm-super/sfti1095.pfb></opt/homebr
 ew/Cellar/texlive/20250308_1/share/texmf-dist/fonts/type1/public/cm-super/sftt1
 200.pfb>
-Output written on docs/report.pdf (4 pages, 256870 bytes).
+Output written on report.pdf (5 pages, 268179 bytes).
 PDF statistics:
- 145 PDF objects out of 1000 (max. 8388607)
- 104 compressed objects within 2 object streams
+ 194 PDF objects out of 1000 (max. 8388607)
+ 152 compressed objects within 2 object streams
  33 named destinations out of 1000 (max. 500000)
- 1 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 121 words of extra memory for PDF output out of 10000 (max. 10000000)
 

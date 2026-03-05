@@ -18,7 +18,7 @@ def normalize_logs_frame(frame: pd.DataFrame) -> pd.DataFrame:
     normalized["atraso_min"] = pd.to_numeric(normalized["atraso_min"], errors="coerce").fillna(0).astype(int)
     normalized["timestamp"] = pd.to_datetime(normalized["timestamp"], errors="coerce", utc=True)
     normalized = normalized.dropna(subset=["timestamp"]).reset_index(drop=True)
-    normalized["timestamp_epoch"] = (normalized["timestamp"].astype("int64") // 1_000_000_000).astype("int64")
+    normalized["timestamp_epoch"] = normalized["timestamp"].map(lambda value: int(value.timestamp())).astype("int64")
     normalized["timestamp_label"] = normalized["timestamp"].dt.tz_convert("America/Fortaleza")
     normalized["data"] = normalized["timestamp_label"].dt.date.astype(str)
     normalized["hora"] = normalized["timestamp_label"].dt.hour
