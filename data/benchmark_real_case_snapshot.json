@@ -1,0 +1,14 @@
+{
+  "start_label": "07/02/2026 11:14",
+  "end_label": "07/02/2026 17:43",
+  "min_delay": 30,
+  "total_events": 50002,
+  "delayed_events": 5015,
+  "build_seconds": 0.038665708038024604,
+  "linear_query_seconds": 0.004443624999839813,
+  "indexed_query_seconds": 1.3810399104841053e-06,
+  "linear_runs": 5,
+  "indexed_runs": 200,
+  "speedup_x": 3217.59,
+  "same_answer": true
+}

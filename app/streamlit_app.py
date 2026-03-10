@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 import pandas as pd
@@ -10,6 +12,7 @@ from logisticama.adapters.persistence.indexed_repository import IndexedLogReposi
 from logisticama.adapters.presentation.theme import apply_theme
 from logisticama.application.benchmarking import (
     DEFAULT_BENCHMARK_SIZES,
+    RealCaseBenchmark,
     benchmark_cases,
     benchmark_real_case,
 )
@@ -28,6 +31,9 @@ LINE = "#D7DFE5"
 PANEL = "#FFFFFF"
 PAGE_OPERATION = "Operação"
 PAGE_BENCHMARK = "Benchmark"
+BENCHMARK_CASES_SNAPSHOT_PATH = Path("data/benchmark_cases_snapshot.csv")
+BENCHMARK_REAL_CASE_SNAPSHOT_PATH = Path("data/benchmark_real_case_snapshot.json")
+BENCHMARK_TIME_COLUMNS = ("build_seconds", "linear_query_seconds", "indexed_query_seconds")
 
 
 st.set_page_config(
@@ -46,11 +52,37 @@ def load_default_frame() -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def load_benchmark_frame(sizes: tuple[int, ...] = DEFAULT_BENCHMARK_SIZES) -> pd.DataFrame:
+    if BENCHMARK_CASES_SNAPSHOT_PATH.exists():
+        try:
+            frame = pd.read_csv(BENCHMARK_CASES_SNAPSHOT_PATH)
+            expected_columns = {
+                "n",
+                "build_seconds",
+                "linear_query_seconds",
+                "indexed_query_seconds",
+                "linear_runs",
+                "indexed_runs",
+                "speedup_x",
+                "same_answer",
+            }
+            if expected_columns.issubset(frame.columns):
+                frame["same_answer"] = frame["same_answer"].map(lambda value: str(value).lower() == "true")
+                if not benchmark_snapshot_is_legacy(frame):
+                    return frame
+        except (OSError, ValueError, pd.errors.ParserError):
+            pass
     return benchmark_cases(sizes)
 
 
 @st.cache_data(show_spinner=False)
 def load_real_case_benchmark():
+    if BENCHMARK_REAL_CASE_SNAPSHOT_PATH.exists():
+        try:
+            payload = json.loads(BENCHMARK_REAL_CASE_SNAPSHOT_PATH.read_text(encoding="utf-8"))
+            if not real_case_snapshot_is_legacy(payload):
+                return RealCaseBenchmark(**payload)
+        except (OSError, ValueError, TypeError):
+            pass
     return benchmark_real_case()
 
 
@@ -75,23 +107,46 @@ def format_percent(value: float) -> str:
     return f"{value * 100:.1f}%".replace(".", ",")
 
 
-def format_duration(seconds: float) -> str:
-    if seconds < 1:
-        milliseconds = seconds * 1000
-        if round(milliseconds, 1) == 0:
-            microseconds = seconds * 1_000_000
-            return f"{microseconds:.1f} μs".replace(".", ",")
-        return f"{milliseconds:.1f} ms".replace(".", ",")
-    return f"{seconds:.2f} s".replace(".", ",")
+def seconds_to_milliseconds_decimal(value: float | int | str) -> Decimal:
+    return Decimal(str(value)) * Decimal("1000")
+
+
+def milliseconds_float(value: float | int | str) -> float:
+    return float(seconds_to_milliseconds_decimal(value))
+
+
+def benchmark_snapshot_is_legacy(frame: pd.DataFrame) -> bool:
+    indexed = pd.to_numeric(frame["indexed_query_seconds"], errors="coerce")
+    if indexed.isna().any() or indexed.empty:
+        return True
+    return bool(indexed.nunique(dropna=False) == 1 and indexed.eq(0.000001).all())
+
+
+def real_case_snapshot_is_legacy(payload: dict[str, object]) -> bool:
+    indexed_value = payload.get("indexed_query_seconds")
+    try:
+        return float(indexed_value) == 0.000001
+    except (TypeError, ValueError):
+        return True
+
+
+def format_benchmark_duration_ms(value: float | int | str) -> str:
+    milliseconds = seconds_to_milliseconds_decimal(value)
+    if abs(milliseconds) < Decimal("1"):
+        milliseconds = milliseconds.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        return f"~{milliseconds:f} ms".replace(".", ",")
+    if abs(milliseconds) >= Decimal("1"):
+        milliseconds = milliseconds.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    return f"{milliseconds:f} ms".replace(".", ",")
 
 
 def format_minutes(value: float) -> str:
     return f"{value:.2f} min".replace(".", ",")
 
 
-def render_app_header(data_label: str) -> None:
+def render_app_header() -> None:
     st.markdown(
-        f"""
+                """
         <div class="app-shell">
           <div class="top-note">Desafio 4.0 | Dashboard do caso LogisticaMA</div>
           <h1 class="page-title">LogisticaMA</h1>
@@ -99,7 +154,6 @@ def render_app_header(data_label: str) -> None:
             Acompanhe a operação da base oficial e compare o algoritmo antigo com o novo motor indexado
             sem alternar de página. A análise operacional fica em uma tab; a evidência técnica do benchmark, na outra.
           </p>
-          <div class="page-meta">{data_label}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -184,28 +238,36 @@ def make_hub_chart(hub_rates: pd.DataFrame) -> go.Figure:
 
 def make_benchmark_chart(benchmark_frame: pd.DataFrame) -> go.Figure:
     labels = [format_size_label(int(value)) for value in benchmark_frame["n"]]
+    linear_ms = [milliseconds_float(value) for value in benchmark_frame["linear_query_seconds"]]
+    indexed_ms = [milliseconds_float(value) for value in benchmark_frame["indexed_query_seconds"]]
+    linear_labels = [format_benchmark_duration_ms(value) for value in benchmark_frame["linear_query_seconds"]]
+    indexed_labels = [format_benchmark_duration_ms(value) for value in benchmark_frame["indexed_query_seconds"]]
     fig = go.Figure()
     fig.add_trace(
         go.Bar(
             x=labels,
-            y=benchmark_frame["linear_query_seconds"],
+            y=linear_ms,
             name="Algoritmo antigo",
             marker=dict(color=ALERT),
-            text=[format_duration(value) for value in benchmark_frame["linear_query_seconds"]],
+            text=linear_labels,
+            customdata=linear_labels,
             textposition="outside",
-            hovertemplate="Linear<br>Tamanho: %{x}<br>Tempo: %{y:.4f} s<extra></extra>",
+            cliponaxis=False,
+            hovertemplate="Algoritmo antigo<br>Tamanho: %{x}<br>Tempo: %{customdata}<extra></extra>",
             width=0.28,
         )
     )
     fig.add_trace(
         go.Bar(
             x=labels,
-            y=benchmark_frame["indexed_query_seconds"],
+            y=indexed_ms,
             name="Algoritmo novo",
             marker=dict(color=BLUE),
-            text=[format_duration(value) for value in benchmark_frame["indexed_query_seconds"]],
+            text=indexed_labels,
+            customdata=indexed_labels,
             textposition="outside",
-            hovertemplate="Indexado<br>Tamanho: %{x}<br>Tempo: %{y:.4f} s<extra></extra>",
+            cliponaxis=False,
+            hovertemplate="Algoritmo novo<br>Tamanho: %{x}<br>Tempo: %{customdata}<extra></extra>",
             width=0.28,
         )
     )
@@ -213,8 +275,8 @@ def make_benchmark_chart(benchmark_frame: pd.DataFrame) -> go.Figure:
         barmode="group",
         paper_bgcolor=PANEL,
         plot_bgcolor=PANEL,
-        margin=dict(l=10, r=10, t=10, b=8),
-        height=320,
+        margin=dict(l=10, r=18, t=10, b=8),
+        height=380,
         font=dict(family="IBM Plex Sans, sans-serif", color=TEXT, size=13),
         legend=dict(
             orientation="h",
@@ -231,31 +293,36 @@ def make_benchmark_chart(benchmark_frame: pd.DataFrame) -> go.Figure:
         tickfont=dict(color=TEXT),
     )
     fig.update_yaxes(
-        title=None,
+        title="Tempo (ms)",
         gridcolor=LINE,
         zeroline=False,
         tickfont=dict(color=MUTED),
+        automargin=True,
     )
     return fig
 
 
 def make_build_chart(benchmark_frame: pd.DataFrame) -> go.Figure:
     labels = [format_size_label(int(value)) for value in benchmark_frame["n"]]
+    build_ms = [milliseconds_float(value) for value in benchmark_frame["build_seconds"]]
+    build_labels = [format_benchmark_duration_ms(value) for value in benchmark_frame["build_seconds"]]
     fig = go.Figure(
         go.Bar(
             x=labels,
-            y=benchmark_frame["build_seconds"],
+            y=build_ms,
             marker=dict(color=BLUE_SOFT, line=dict(color=BLUE_SOFT, width=1)),
-            text=[format_duration(value) for value in benchmark_frame["build_seconds"]],
+            text=build_labels,
+            customdata=build_labels,
             textposition="outside",
-            hovertemplate="Pré-processamento<br>Tamanho: %{x}<br>Tempo: %{y:.4f} s<extra></extra>",
+            cliponaxis=False,
+            hovertemplate="Pré-processamento<br>Tamanho: %{x}<br>Tempo: %{customdata}<extra></extra>",
         )
     )
     fig.update_layout(
         paper_bgcolor=PANEL,
         plot_bgcolor=PANEL,
-        margin=dict(l=10, r=10, t=10, b=8),
-        height=320,
+        margin=dict(l=10, r=18, t=10, b=8),
+        height=280,
         font=dict(family="IBM Plex Sans, sans-serif", color=TEXT, size=13),
         showlegend=False,
     )
@@ -265,10 +332,11 @@ def make_build_chart(benchmark_frame: pd.DataFrame) -> go.Figure:
         tickfont=dict(color=TEXT),
     )
     fig.update_yaxes(
-        title=None,
+        title="Tempo (ms)",
         gridcolor=LINE,
         zeroline=False,
         tickfont=dict(color=MUTED),
+        automargin=True,
     )
     return fig
 
@@ -276,8 +344,8 @@ def make_build_chart(benchmark_frame: pd.DataFrame) -> go.Figure:
 def make_benchmark_table(benchmark_frame: pd.DataFrame) -> pd.DataFrame:
     table = benchmark_frame.copy()
     table["n"] = table["n"].map(format_int)
-    for column in ("build_seconds", "linear_query_seconds", "indexed_query_seconds"):
-        table[column] = table[column].map(format_duration)
+    for column in BENCHMARK_TIME_COLUMNS:
+        table[column] = table[column].map(format_benchmark_duration_ms)
     table["speedup_x"] = table["speedup_x"].map(lambda value: f"{value:.2f}x".replace(".", ","))
     table["same_answer"] = table["same_answer"].map(lambda value: "Sim" if value else "Nao")
     table = table.drop(columns=["linear_runs", "indexed_runs"], errors="ignore")
@@ -410,44 +478,52 @@ def render_operations_tab(frame: pd.DataFrame, service: QueryLogisticsDashboard)
         unsafe_allow_html=True,
     )
 
-    chart_col, table_col = st.columns([1.45, 0.95])
-    with chart_col:
-        st.markdown(
-            """
-            <div class="section-card">
-              <h2 class="section-title">Atraso por hub</h2>
-              <div class="section-note">percentual de eventos acima do limiar no recorte atual</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.plotly_chart(make_hub_chart(hub_rates), use_container_width=True, config={"displayModeBar": False})
+    st.markdown(
+        """
+        <div class="section-card">
+          <h2 class="section-title">Atraso por hub</h2>
+          <div class="section-note">percentual de eventos acima do limiar no recorte atual</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.plotly_chart(make_hub_chart(hub_rates), use_container_width=True, config={"displayModeBar": False})
 
-    with table_col:
-        st.markdown(
-            """
-            <div class="section-card">
-              <h2 class="section-title">Resumo por hub</h2>
-              <div class="section-note">percentual, volume e atraso médio</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        hub_table = hub_rates.copy()
-        hub_table["eventos"] = hub_table["eventos"].map(format_int)
-        hub_table["atrasos"] = hub_table["atrasos"].map(format_int)
-        hub_table["percentual_atraso"] = hub_table["percentual_atraso"].map(format_percent)
-        hub_table["atraso_medio"] = hub_table["atraso_medio"].map(format_minutes)
-        hub_table = hub_table.rename(
-            columns={
-                "hub": "Hub",
-                "eventos": "Eventos",
-                "atrasos": "Atrasos",
-                "percentual_atraso": "Taxa de atraso",
-                "atraso_medio": "Atraso médio",
-            }
-        )
-        st.dataframe(hub_table, use_container_width=True, hide_index=True)
+    st.markdown(
+        """
+        <div class="section-card">
+          <h2 class="section-title">Resumo por hub</h2>
+          <div class="section-note">percentual, volume e atraso médio</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    hub_table = hub_rates.copy()
+    hub_table["eventos"] = hub_table["eventos"].map(format_int)
+    hub_table["atrasos"] = hub_table["atrasos"].map(format_int)
+    hub_table["percentual_atraso"] = hub_table["percentual_atraso"].map(format_percent)
+    hub_table["atraso_medio"] = hub_table["atraso_medio"].map(format_minutes)
+    hub_table = hub_table.rename(
+        columns={
+            "hub": "Hub",
+            "eventos": "Eventos",
+            "atrasos": "Atrasos",
+            "percentual_atraso": "Taxa de atraso",
+            "atraso_medio": "Atraso médio",
+        }
+    )
+    st.dataframe(
+        hub_table,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Hub": st.column_config.TextColumn("Hub", width="large"),
+            "Eventos": st.column_config.TextColumn("Eventos", width="small"),
+            "Atrasos": st.column_config.TextColumn("Atrasos", width="small"),
+            "Taxa de atraso": st.column_config.TextColumn("Taxa de atraso", width="small"),
+            "Atraso médio": st.column_config.TextColumn("Atraso médio", width="small"),
+        },
+    )
 
 
 def render_benchmark_methodology(real_case, benchmark_frame: pd.DataFrame) -> None:
@@ -512,7 +588,7 @@ def render_algorithm_summary_section() -> None:
     )
 
 
-def render_benchmark_tab(data_label: str) -> None:
+def render_benchmark_tab() -> None:
     render_tab_intro(
         PAGE_BENCHMARK,
         "Benchmark dos algoritmos",
@@ -526,16 +602,29 @@ def render_benchmark_tab(data_label: str) -> None:
     validation_ok = bool(benchmark_frame["same_answer"].all() and real_case.same_answer)
 
     render_benchmark_methodology(real_case, benchmark_frame)
+    st.markdown(
+        """
+        <div class="benchmark-context">
+          <div class="top-note">benchmark normalizado</div>
+          <div class="benchmark-context-title">Todos os tempos em ms</div>
+          <p class="benchmark-context-copy">
+            Cards, gráficos, tooltips e tabela usam a mesma unidade e preservam a precisão disponível
+            dos benchmarks carregados no app.
+          </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     benchmark_specs = [
         (
             "Tempo do algoritmo antigo",
-            format_duration(real_case.linear_query_seconds),
+            format_benchmark_duration_ms(real_case.linear_query_seconds),
             f"Média no caso real com {real_case.linear_runs} execuções lineares no mesmo recorte.",
         ),
         (
             "Tempo do algoritmo novo",
-            format_duration(real_case.indexed_query_seconds),
+            format_benchmark_duration_ms(real_case.indexed_query_seconds),
             f"Média no mesmo caso real com {real_case.indexed_runs} execuções indexadas.",
         ),
         (
@@ -551,30 +640,29 @@ def render_benchmark_tab(data_label: str) -> None:
     else:
         st.error("Há divergência entre os resultados linear e indexado. A evidência técnica precisa ser corrigida antes de ser usada.")
 
-    chart_col, build_col = st.columns([1.4, 1.0])
-    with chart_col:
-        st.markdown(
-            """
-            <div class="section-card">
-              <h2 class="section-title">Consulta antiga vs nova por tamanho</h2>
-              <div class="section-note">curva complementar de 1k a 2M eventos</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.plotly_chart(make_benchmark_chart(benchmark_frame), use_container_width=True, config={"displayModeBar": False})
+    st.markdown(
+        """
+        <div class="benchmark-panel benchmark-panel--primary">
+          <div class="benchmark-chip">todos os tempos em ms</div>
+          <h2 class="section-title">Consulta antiga vs nova por tamanho</h2>
+          <div class="section-note">curva complementar de 1k a 2M eventos</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.plotly_chart(make_benchmark_chart(benchmark_frame), use_container_width=True, config={"displayModeBar": False})
 
-    with build_col:
-        st.markdown(
-            """
-            <div class="section-card">
-              <h2 class="section-title">Custo do pré-processamento</h2>
-              <div class="section-note">tempo pago uma vez para construir o índice</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.plotly_chart(make_build_chart(benchmark_frame), use_container_width=True, config={"displayModeBar": False})
+    st.markdown(
+        """
+        <div class="benchmark-panel benchmark-panel--secondary">
+          <div class="benchmark-chip">custo pago uma vez</div>
+          <h2 class="section-title">Custo do pré-processamento</h2>
+          <div class="section-note">tempo para construir o índice antes das consultas</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.plotly_chart(make_build_chart(benchmark_frame), use_container_width=True, config={"displayModeBar": False})
 
     st.markdown(
         """
@@ -598,7 +686,7 @@ def render_benchmark_tab(data_label: str) -> None:
         ),
         (
             "Pré-processamento",
-            format_duration(real_case.build_seconds),
+            format_benchmark_duration_ms(real_case.build_seconds),
             "Tempo para construir o índice, separado da consulta indexada.",
         ),
     ]
@@ -614,10 +702,6 @@ def render_benchmark_tab(data_label: str) -> None:
         unsafe_allow_html=True,
     )
     st.dataframe(make_benchmark_table(benchmark_frame), use_container_width=True, hide_index=True)
-    st.markdown(
-        f'<div class="small-note">Fonte do benchmark: {data_label}. A coluna "Mesmo resultado" deve permanecer "Sim" em toda a tabela.</div>',
-        unsafe_allow_html=True,
-    )
 
 
 def main() -> None:
@@ -629,22 +713,16 @@ def main() -> None:
         st.code(str(exc))
         return
 
-    data_label = (
-        f"Fonte: base oficial local ({Path(OFFICIAL_DATASET_PATH).as_posix()}) | "
-        f"{format_int(len(frame))} eventos | "
-        f"{frame['timestamp_label'].min().strftime('%d/%m/%Y %H:%M')} até "
-        f"{frame['timestamp_label'].max().strftime('%d/%m/%Y %H:%M')}"
-    )
     service, _repository = build_service(frame)
 
-    render_app_header(data_label)
+    render_app_header()
     operation_tab, benchmark_tab = st.tabs([PAGE_OPERATION, PAGE_BENCHMARK])
 
     with operation_tab:
         render_operations_tab(frame, service)
 
     with benchmark_tab:
-        render_benchmark_tab(data_label)
+        render_benchmark_tab()
 
 
 if __name__ == "__main__":

@@ -40,12 +40,12 @@ button[kind="header"][aria-label*="Sidebar"] {
 }
 
 .app-shell {
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
 .tab-shell {
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
   padding-bottom: 1rem;
 }
@@ -162,6 +162,8 @@ button[kind="header"][aria-label*="Sidebar"] {
   line-height: 1.05;
   font-weight: 700;
   margin-top: 0.5rem;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .metric-subtitle {
@@ -197,6 +199,62 @@ button[kind="header"][aria-label*="Sidebar"] {
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   margin-top: 0.3rem;
+}
+
+.benchmark-context {
+  background: linear-gradient(135deg, rgba(38, 70, 83, 0.98) 0%, rgba(38, 70, 83, 0.9) 100%);
+  border: 1px solid rgba(38, 70, 83, 0.14);
+  border-radius: 16px;
+  padding: 1rem 1.1rem 1.05rem;
+  margin: 0.8rem 0 1rem;
+  box-shadow: 0 18px 34px rgba(38, 70, 83, 0.1);
+}
+
+.benchmark-context .top-note {
+  color: rgba(247, 248, 245, 0.72);
+}
+
+.benchmark-context-title {
+  color: #F7F8F5;
+  font-size: clamp(1.08rem, 2vw, 1.32rem);
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.benchmark-context-copy {
+  color: rgba(247, 248, 245, 0.82);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  max-width: 60rem;
+  margin: 0.35rem 0 0;
+}
+
+.benchmark-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 1) 100%);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 0.95rem 1rem 0.55rem;
+  margin-top: 0.95rem;
+  box-shadow: 0 12px 26px rgba(38, 70, 83, 0.06);
+}
+
+.benchmark-panel--secondary {
+  margin-top: 1.1rem;
+}
+
+.benchmark-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.58rem;
+  margin-bottom: 0.55rem;
+  border-radius: 999px;
+  background: rgba(159, 181, 195, 0.18);
+  color: var(--blue);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .stPlotlyChart {

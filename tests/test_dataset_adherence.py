@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import functools
 import io
 import importlib.util
 import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from logisticama.adapters.ingest.loaders import FileLogSource, UploadedLogSource
 from logisticama.adapters.persistence.indexed_repository import IndexedLogRepository, linear_delay_count
@@ -62,6 +64,17 @@ def canonical_records(frame: pd.DataFrame) -> list[dict[str, object]]:
 
 def load_benchmark_cli_module():
     spec = importlib.util.spec_from_file_location("logisticama_benchmark_cli", BENCHMARK_SCRIPT_PATH)
+    assert spec is not None
+    assert spec.loader is not None
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@functools.lru_cache(maxsize=1)
+def load_streamlit_app_module():
+    spec = importlib.util.spec_from_file_location("logisticama_streamlit_app", STREAMLIT_APP_PATH)
     assert spec is not None
     assert spec.loader is not None
 
@@ -201,6 +214,55 @@ def test_benchmark_frame_exposes_runtime_metadata() -> None:
     assert (frame["indexed_query_seconds"] > 0).all()
 
 
+def test_benchmark_durations_are_not_rounded(monkeypatch) -> None:
+    from logisticama.application import benchmarking as module
+
+    query_times = iter((0.000001234567, 0.000000987654))
+    perf_counter_values = iter((10.0, 10.123456789))
+
+    monkeypatch.setattr(module, "average_query_seconds", lambda callback, runs: next(query_times))
+    monkeypatch.setattr(module.time, "perf_counter", lambda: next(perf_counter_values))
+
+    result = module.benchmark_case(1_000)
+
+    assert result["build_seconds"] == pytest.approx(0.123456789)
+    assert result["linear_query_seconds"] == pytest.approx(0.000001234567)
+    assert result["indexed_query_seconds"] == pytest.approx(0.000000987654)
+
+
+def test_streamlit_app_formats_benchmark_times_in_ms_with_conditional_precision() -> None:
+    module = load_streamlit_app_module()
+
+    assert module.format_benchmark_duration_ms(0.000001179375103674829) == "~0,0012 ms"
+    assert module.format_benchmark_duration_ms(0.000999) == "~0,9990 ms"
+    assert module.format_benchmark_duration_ms(0.002941) == "2,94 ms"
+    assert module.format_benchmark_duration_ms(0.038732) == "38,73 ms"
+    assert module.format_benchmark_duration_ms(0.123456789) == "123,45 ms"
+
+
+def test_streamlit_app_detects_legacy_benchmark_snapshots() -> None:
+    module = load_streamlit_app_module()
+    legacy = pd.DataFrame(
+        {
+            "n": [1_000, 10_000],
+            "build_seconds": [0.002941, 0.005340],
+            "linear_query_seconds": [0.000042, 0.000424],
+            "indexed_query_seconds": [0.000001, 0.000001],
+            "linear_runs": [5, 5],
+            "indexed_runs": [200, 200],
+            "speedup_x": [37.27, 364.92],
+            "same_answer": [True, True],
+        }
+    )
+    precise = legacy.copy()
+    precise["indexed_query_seconds"] = [0.000001179375103674829, 0.0000012270850129425526]
+
+    assert module.benchmark_snapshot_is_legacy(legacy) is True
+    assert module.benchmark_snapshot_is_legacy(precise) is False
+    assert module.real_case_snapshot_is_legacy({"indexed_query_seconds": 0.000001}) is True
+    assert module.real_case_snapshot_is_legacy({"indexed_query_seconds": 0.0000013810399104841053}) is False
+
+
 def test_streamlit_app_uses_hardcoded_base_and_has_no_uploader() -> None:
     contents = STREAMLIT_APP_PATH.read_text(encoding="utf-8")
 
@@ -210,5 +272,6 @@ def test_streamlit_app_uses_hardcoded_base_and_has_no_uploader() -> None:
     assert "load_official_frame" in contents
     assert "PAGE_OPERATION" in contents
     assert "PAGE_BENCHMARK" in contents
-    assert "μs" in contents
+    assert "Todos os tempos em ms" in contents
+    assert "format_benchmark_duration_ms" in contents
     assert "Resumo do algoritmo novo" in contents
