@@ -272,6 +272,7 @@ def test_streamlit_app_uses_hardcoded_base_and_has_no_uploader() -> None:
     assert "load_official_frame" in contents
     assert "PAGE_OPERATION" in contents
     assert "PAGE_BENCHMARK" in contents
-    assert "Todos os tempos em ms" in contents
+    assert "benchmark normalizado" in contents
+    assert "Consulta antiga vs nova por tamanho" in contents
     assert "format_benchmark_duration_ms" in contents
-    assert "Resumo do algoritmo novo" in contents
+    assert "Resumo do algoritmo" in contents

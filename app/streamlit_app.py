@@ -532,7 +532,6 @@ def render_benchmark_methodology(real_case, benchmark_frame: pd.DataFrame) -> No
     st.markdown(
         f"""
         <div class="method-card">
-          <div class="top-note">Como o benchmark é feito</div>
           <h2 class="section-title">Mesmo recorte, mesmo limiar, duas estratégias de consulta</h2>
           <p class="page-copy">
             O algoritmo antigo faz uma varredura linear completa sobre os registros do recorte.
@@ -561,7 +560,6 @@ def render_algorithm_summary_section() -> None:
     st.markdown(
         """
         <div class="method-card">
-          <div class="top-note">Resumo do algoritmo novo</div>
           <h2 class="section-title">Resumo do algoritmo</h2>
           <p class="page-copy">
             Em analise de algoritmos, a ideia principal e reduzir a quantidade de trabalho por consulta.
@@ -606,7 +604,6 @@ def render_benchmark_tab() -> None:
         """
         <div class="benchmark-context">
           <div class="top-note">benchmark normalizado</div>
-          <div class="benchmark-context-title">Todos os tempos em ms</div>
           <p class="benchmark-context-copy">
             Cards, gráficos, tooltips e tabela usam a mesma unidade e preservam a precisão disponível
             dos benchmarks carregados no app.
@@ -643,9 +640,8 @@ def render_benchmark_tab() -> None:
     st.markdown(
         """
         <div class="benchmark-panel benchmark-panel--primary">
-          <div class="benchmark-chip">todos os tempos em ms</div>
           <h2 class="section-title">Consulta antiga vs nova por tamanho</h2>
-          <div class="section-note">curva complementar de 1k a 2M eventos</div>
+          <div class="section-note">Curva complementar de 1k a 2M eventos</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -657,7 +653,7 @@ def render_benchmark_tab() -> None:
         <div class="benchmark-panel benchmark-panel--secondary">
           <div class="benchmark-chip">custo pago uma vez</div>
           <h2 class="section-title">Custo do pré-processamento</h2>
-          <div class="section-note">tempo para construir o índice antes das consultas</div>
+          <div class="section-note">Tempo para construir o índice antes das consultas</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -668,7 +664,6 @@ def render_benchmark_tab() -> None:
         """
         <div class="section-card">
           <h2 class="section-title">Detalhes do caso real</h2>
-          <div class="section-note">mesma base oficial usada na tab Operação</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -696,7 +691,7 @@ def render_benchmark_tab() -> None:
         """
         <div class="section-card">
           <h2 class="section-title">Tabela de validação</h2>
-          <div class="section-note">benchmark completo com prova de equivalência</div>
+          <div class="section-note">Benchmark completo com prova de equivalência</div>
         </div>
         """,
         unsafe_allow_html=True,
